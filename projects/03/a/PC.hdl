@@ -16,5 +16,17 @@ CHIP PC {
     OUT out[16];
 
     PARTS:
-    // Put your code here:
+    Inc16(in = feedback, out=incfeedback);
+        Mux8Way16(sel[0] = inc, sel[1] = load,
+                                sel[2] = reset,
+                                a = feedback,
+                                b = incfeedback,
+                                c = in,
+                                d = in,
+                                e = false,
+                                f = false,
+                                g = false,
+                                h = false,
+                                out = procfeedback);
+        Register(in=procfeedback, load=true, out=out, out=feedback);
 }

@@ -6,23 +6,23 @@
 /**
  * The Hack CPU (Central Processing unit), consisting of an ALU,
  * two registers named A and D, and a program counter named PC.
- * The CPU is designed to fetch and execute instructions written in 
+ * The CPU is designed to fetch and execute instructions written in
  * the Hack machine language. In particular, functions as follows:
- * Executes the inputted instruction according to the Hack machine 
+ * Executes the inputted instruction according to the Hack machine
  * language specification. The D and A in the language specification
  * refer to CPU-resident registers, while M refers to the external
- * memory location addressed by A, i.e. to Memory[A]. The inM input 
- * holds the value of this location. If the current instruction needs 
- * to write a value to M, the value is placed in outM, the address 
- * of the target location is placed in the addressM output, and the 
- * writeM control bit is asserted. (When writeM==0, any value may 
- * appear in outM). The outM and writeM outputs are combinational: 
- * they are affected instantaneously by the execution of the current 
- * instruction. The addressM and pc outputs are clocked: although they 
- * are affected by the execution of the current instruction, they commit 
- * to their new values only in the next time step. If reset==1 then the 
- * CPU jumps to address 0 (i.e. pc is set to 0 in next time step) rather 
- * than to the address resulting from executing the current instruction. 
+ * memory location addressed by A, i.e. to Memory[A]. The inM input
+ * holds the value of this location. If the current instruction needs
+ * to write a value to M, the value is placed in outM, the address
+ * of the target location is placed in the addressM output, and the
+ * writeM control bit is asserted. (When writeM==0, any value may
+ * appear in outM). The outM and writeM outputs are combinational:
+ * they are affected instantaneously by the execution of the current
+ * instruction. The addressM and pc outputs are clocked: although they
+ * are affected by the execution of the current instruction, they commit
+ * to their new values only in the next time step. If reset==1 then the
+ * CPU jumps to address 0 (i.e. pc is set to 0 in next time step) rather
+ * than to the address resulting from executing the current instruction.
  */
 
 CHIP CPU {
@@ -34,10 +34,48 @@ CHIP CPU {
                          // the current program (reset==0).
 
     OUT outM[16],        // M value output
-        writeM,          // Write to M? 
+        writeM,          // Write to M?
         addressM[15],    // Address in data memory (of M)
         pc[15];          // address of next instruction
 
     PARTS:
-    // Put your code here:
+   Not(in=instruction[15], out=aInstructionP);
+       And(a=instruction[15], b=instruction[3], out=writeM);
+
+       Mux16(a=ALUOut, b=instruction, sel=aInstructionP, out=newA);
+       And(a=instruction[5], b=instruction[15], out=storeAP1);
+       Or(a=storeAP1, b=aInstructionP, out=storeAP);
+       ARegister(in=newA, out=storedA, out[0..14]=addressM, load=storeAP);
+
+       Mux16(a=storedA, b=inM, sel=instruction[12], out=ALUInAM);
+
+       ALU(x=storedD, y=ALUInAM,
+                      out=ALUOut,
+                      out=outM,
+                      zx=instruction[11],
+                      nx=instruction[10],
+                      zy=instruction[9],
+                      ny=instruction[8],
+                      f=instruction[7],
+                      no=instruction[6],
+                      ng=ng,
+                      zr=zr);
+
+       And(a=instruction[4], b=instruction[15], out=storeDP);
+       DRegister(in=ALUOut, out=storedD, load=storeDP);
+
+       Not(in=zr, out=zrinv);
+       Not(in=ng, out=nginv);
+
+       And(a=zrinv, b=nginv, out=JGT1);
+       And(a=instruction[0], b=JGT1, out=JGT);
+
+       And(a=zr, b=instruction[1], out=JEQ);
+       Or(a=JEQ, b=JGT, out=Load1);
+
+       And(a=ng, b=instruction[2], out=JLT);
+       Or(a=JLT, b=Load1, out=Load2);
+       And(a=Load2, b=instruction[15], out=Load3);
+
+       PC(in=storedA, load=Load3, inc=true, reset=reset, out[0..14]=pc);
 }
